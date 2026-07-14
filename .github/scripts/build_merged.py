@@ -48,6 +48,18 @@ OUT_MANIFEST = "pcd.json"
 
 NAMESPACE_SUFFIX = " [Dumpstarr]"
 
+# ----------------------------------------------------------------------------
+# Language priority: Spanish (Latino) audio preferred, Original language audio
+# as fallback. Soft scoring only (no bans) -- a release with Latino audio
+# outscores one with only Original audio, which outscores one with neither.
+# ----------------------------------------------------------------------------
+LATINO_LANGUAGE   = "Spanish (Latino)"
+ORIGINAL_LANGUAGE = "Original"
+LATINO_CF_NAME    = "Spanish (Latino) Audio"
+ORIGINAL_CF_NAME  = "Original Language Audio"
+LATINO_SCORE      = 50
+ORIGINAL_SCORE    = 25
+
 # Columns that reference an entity name and must be rewritten when its parent
 # entity is namespaced.
 NAME_REF_COLUMNS = {
@@ -237,6 +249,49 @@ def build_rename_maps(dict_con, dump_con):
     return cf_renames, re_renames
 
 
+def build_language_priority_sql(profile_arr_types):
+    """Layer 3: inject a Spanish (Latino)-first / Original-language-fallback
+    scoring preference into every quality profile, mirroring the arr_type(s)
+    it's already scored under (so a Radarr-only profile stays Radarr-only,
+    etc). Positive scores only -- this is a preference, not a filter."""
+    lines = [
+        "-- ===== Layer 3: Language priority "
+        f"({LATINO_LANGUAGE} > {ORIGINAL_LANGUAGE}) =====",
+        "",
+        f'INSERT OR IGNORE INTO "custom_formats" ("name", "description", "include_in_rename") '
+        f"VALUES ('{LATINO_CF_NAME}', 'Matches releases with a {LATINO_LANGUAGE} audio track.', 0);",
+        f'INSERT OR IGNORE INTO "custom_formats" ("name", "description", "include_in_rename") '
+        f"VALUES ('{ORIGINAL_CF_NAME}', 'Matches releases with the {ORIGINAL_LANGUAGE} language audio track.', 0);",
+        "",
+        f'INSERT OR IGNORE INTO "custom_format_conditions" '
+        f'("custom_format_name", "name", "type", "arr_type", "negate", "required") '
+        f"VALUES ('{LATINO_CF_NAME}', '{LATINO_LANGUAGE}', 'language', 'all', 0, 1);",
+        f'INSERT OR IGNORE INTO "custom_format_conditions" '
+        f'("custom_format_name", "name", "type", "arr_type", "negate", "required") '
+        f"VALUES ('{ORIGINAL_CF_NAME}', '{ORIGINAL_LANGUAGE}', 'language', 'all', 0, 1);",
+        "",
+        f'INSERT OR IGNORE INTO "condition_languages" '
+        f'("custom_format_name", "condition_name", "language_name", "except_language") '
+        f"VALUES ('{LATINO_CF_NAME}', '{LATINO_LANGUAGE}', '{LATINO_LANGUAGE}', 0);",
+        f'INSERT OR IGNORE INTO "condition_languages" '
+        f'("custom_format_name", "condition_name", "language_name", "except_language") '
+        f"VALUES ('{ORIGINAL_CF_NAME}', '{ORIGINAL_LANGUAGE}', '{ORIGINAL_LANGUAGE}', 0);",
+        "",
+    ]
+    for profile in sorted(profile_arr_types):
+        arr_types = profile_arr_types[profile]
+        targets = {'all'} if 'all' in arr_types else arr_types
+        for arr_type in sorted(targets):
+            for cf_name, score in ((LATINO_CF_NAME, LATINO_SCORE), (ORIGINAL_CF_NAME, ORIGINAL_SCORE)):
+                lines.append(
+                    'INSERT OR IGNORE INTO "quality_profile_custom_formats" '
+                    '("quality_profile_name", "custom_format_name", "arr_type", "score") '
+                    f"VALUES ('{profile}', '{cf_name}', '{arr_type}', {score});"
+                )
+    lines.append("")
+    return "\n".join(lines)
+
+
 def main():
     print("[1/6] Loading Dictionarry chain...")
     dict_con, dict_fails = build_state([SCHEMA_DIR, DICT_DIR])
@@ -296,6 +351,16 @@ PRAGMA foreign_keys = OFF;
         for t in TABLES:
             f.write(dump_table(dump_con, t, cf_rename=cf_renames, re_rename=re_renames))
             f.write("\n")
+
+        profile_arr_types = {}
+        for con in (dict_con, dump_con):
+            for name, arr_type in con.execute(
+                "SELECT DISTINCT quality_profile_name, arr_type FROM quality_profile_custom_formats"
+            ).fetchall():
+                profile_arr_types.setdefault(name, set()).add(arr_type)
+        f.write("\n")
+        f.write(build_language_priority_sql(profile_arr_types))
+
         f.write("\nPRAGMA foreign_keys = ON;\n")
 
     size = os.path.getsize(OUT_SQL)
