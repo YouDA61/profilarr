@@ -61,10 +61,12 @@ LATINO_SCORE      = 50
 ORIGINAL_SCORE    = 25
 
 # ----------------------------------------------------------------------------
-# NekoBT test formats: matches the {Tags:...} block NekoBT appends to its
+# NekoBT formats: matches the {Tags:...} block NekoBT appends to its
 # auto-generated release titles (see wiki.nekobt.to/info/metadata#auto-titles).
 # `A=` is the audio-language tag; codes have dashes stripped (es-419 -> es419).
-# Test-only: created but not scored on any quality profile yet.
+# Scored only on 'Anime 1080p' (NekoBT is an anime-only tracker), at the same
+# scale as the existing 'Anime WEB Tier' formats so it doesn't override
+# quality/tier differences -- it's a preference among similar-quality releases.
 # ----------------------------------------------------------------------------
 NEKOBT_LATINO_CF_NAME   = "NekoBT - Audio: Spanish (Latino)"
 NEKOBT_ORIGINAL_CF_NAME = "NekoBT - Audio: Original (Japanese)"
@@ -72,6 +74,9 @@ NEKOBT_LATINO_RE_NAME   = "NekoBT Tag - Audio Spanish (Latino)"
 NEKOBT_ORIGINAL_RE_NAME = "NekoBT Tag - Audio Japanese"
 NEKOBT_LATINO_PATTERN   = r"{Tags:.*A=[^;]*\b(es419)\b[^;]*\b.*}"
 NEKOBT_ORIGINAL_PATTERN = r"{Tags:.*A=[^;]*\b(ja)\b[^;]*\b.*}"
+NEKOBT_LATINO_SCORE     = 500
+NEKOBT_ORIGINAL_SCORE   = 200
+NEKOBT_TARGET_PROFILE   = "Anime 1080p"
 
 # Columns that reference an entity name and must be rewritten when its parent
 # entity is namespaced.
@@ -305,14 +310,14 @@ def build_language_priority_sql(profile_arr_types):
     return "\n".join(lines)
 
 
-def build_nekobt_test_sql():
-    """Layer 4: NekoBT-specific test custom formats. Match the {Tags:...}
-    block NekoBT appends to release titles rather than Mediainfo audio
-    tracks (Profilarr's usual 'language' condition type can't see these
-    tags -- they only exist in the title). Not scored on any profile yet;
-    this is a standalone test format for manual evaluation."""
-    return "\n".join([
-        "-- ===== Layer 4: NekoBT test formats (Audio tag matching, unscored) =====",
+def build_nekobt_test_sql(profile_arr_types):
+    """Layer 4: NekoBT-specific custom formats. Match the {Tags:...} block
+    NekoBT appends to release titles rather than Mediainfo audio tracks
+    (Profilarr's usual 'language' condition type can't see these tags --
+    they only exist in the title). Scored on 'Anime 1080p' only, mirroring
+    whatever arr_type(s) that profile is already scored under."""
+    lines = [
+        "-- ===== Layer 4: NekoBT test formats (Audio tag matching) =====",
         "",
         f'INSERT OR IGNORE INTO "regular_expressions" ("name", "pattern", "regex101_id", "description") '
         f"VALUES ('{NEKOBT_LATINO_RE_NAME}', '{NEKOBT_LATINO_PATTERN}', NULL, "
@@ -340,7 +345,20 @@ def build_nekobt_test_sql():
         f'("custom_format_name", "condition_name", "regular_expression_name") '
         f"VALUES ('{NEKOBT_ORIGINAL_CF_NAME}', '{NEKOBT_ORIGINAL_RE_NAME}', '{NEKOBT_ORIGINAL_RE_NAME}');",
         "",
-    ])
+    ]
+
+    arr_types = profile_arr_types.get(NEKOBT_TARGET_PROFILE, {'radarr', 'sonarr'})
+    targets = {'all'} if 'all' in arr_types else arr_types
+    for arr_type in sorted(targets):
+        for cf_name, score in ((NEKOBT_LATINO_CF_NAME, NEKOBT_LATINO_SCORE),
+                                (NEKOBT_ORIGINAL_CF_NAME, NEKOBT_ORIGINAL_SCORE)):
+            lines.append(
+                'INSERT OR IGNORE INTO "quality_profile_custom_formats" '
+                '("quality_profile_name", "custom_format_name", "arr_type", "score") '
+                f"VALUES ('{NEKOBT_TARGET_PROFILE}', '{cf_name}', '{arr_type}', {score});"
+            )
+    lines.append("")
+    return "\n".join(lines)
 
 
 def main():
@@ -413,7 +431,7 @@ PRAGMA foreign_keys = OFF;
         f.write(build_language_priority_sql(profile_arr_types))
 
         f.write("\n")
-        f.write(build_nekobt_test_sql())
+        f.write(build_nekobt_test_sql(profile_arr_types))
 
         f.write("\nPRAGMA foreign_keys = ON;\n")
 
