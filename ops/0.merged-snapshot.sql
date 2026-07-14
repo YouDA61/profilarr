@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Merged Profilarr v2 snapshot
--- Generated: 2026-07-13 23:56 UTC
+-- Generated: 2026-07-14 19:10 UTC
 -- Sources:
 --   Dictionarry-Hub/schema    (e1c2bd73)
 --   Dictionarry-Hub/database  @ v2     (fdd2c990)
@@ -16196,5 +16196,22 @@ INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", 
 INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('TV 1080p', 'Original Language Audio', 'sonarr', 25);
 INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('TV 2160p', 'Spanish (Latino) Audio', 'sonarr', 50);
 INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('TV 2160p', 'Original Language Audio', 'sonarr', 25);
+
+-- ===== Layer 4: NekoBT test formats (Audio tag matching) =====
+
+INSERT OR IGNORE INTO "regular_expressions" ("name", "pattern", "regex101_id", "description") VALUES ('NekoBT Tag - Audio Spanish (Latino)', '{Tags:.*A=[^;]*\b(es419)\b[^;]*\b.*}', NULL, 'Matches NekoBT auto-title tag for Spanish (Latin America) audio (A=es419).');
+INSERT OR IGNORE INTO "regular_expressions" ("name", "pattern", "regex101_id", "description") VALUES ('NekoBT Tag - Audio Japanese', '{Tags:.*A=[^;]*\b(ja)\b[^;]*\b.*}', NULL, 'Matches NekoBT auto-title tag for Japanese audio (A=ja).');
+
+INSERT OR IGNORE INTO "custom_formats" ("name", "description", "include_in_rename") VALUES ('NekoBT - Audio: Spanish (Latino)', 'Test format: matches NekoBT releases with a Spanish (Latino) audio track per their auto-title tags.', 0);
+INSERT OR IGNORE INTO "custom_formats" ("name", "description", "include_in_rename") VALUES ('NekoBT - Audio: Original (Japanese)', 'Test format: matches NekoBT releases with a Japanese (original) audio track per their auto-title tags.', 0);
+
+INSERT OR IGNORE INTO "custom_format_conditions" ("custom_format_name", "name", "type", "arr_type", "negate", "required") VALUES ('NekoBT - Audio: Spanish (Latino)', 'NekoBT Tag - Audio Spanish (Latino)', 'release_title', 'all', 0, 1);
+INSERT OR IGNORE INTO "custom_format_conditions" ("custom_format_name", "name", "type", "arr_type", "negate", "required") VALUES ('NekoBT - Audio: Original (Japanese)', 'NekoBT Tag - Audio Japanese', 'release_title', 'all', 0, 1);
+
+INSERT OR IGNORE INTO "condition_patterns" ("custom_format_name", "condition_name", "regular_expression_name") VALUES ('NekoBT - Audio: Spanish (Latino)', 'NekoBT Tag - Audio Spanish (Latino)', 'NekoBT Tag - Audio Spanish (Latino)');
+INSERT OR IGNORE INTO "condition_patterns" ("custom_format_name", "condition_name", "regular_expression_name") VALUES ('NekoBT - Audio: Original (Japanese)', 'NekoBT Tag - Audio Japanese', 'NekoBT Tag - Audio Japanese');
+
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('Anime 1080p', 'NekoBT - Audio: Spanish (Latino)', 'all', 500);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('Anime 1080p', 'NekoBT - Audio: Original (Japanese)', 'all', 25);
 
 PRAGMA foreign_keys = ON;

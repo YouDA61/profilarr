@@ -60,6 +60,24 @@ ORIGINAL_CF_NAME  = "Original Language Audio"
 LATINO_SCORE      = 50
 ORIGINAL_SCORE    = 25
 
+# ----------------------------------------------------------------------------
+# NekoBT formats: matches the {Tags:...} block NekoBT appends to its
+# auto-generated release titles (see wiki.nekobt.to/info/metadata#auto-titles).
+# `A=` is the audio-language tag; codes have dashes stripped (es-419 -> es419).
+# Scored only on 'Anime 1080p' (NekoBT is an anime-only tracker), at the same
+# scale as the existing 'Anime WEB Tier' formats so it doesn't override
+# quality/tier differences -- it's a preference among similar-quality releases.
+# ----------------------------------------------------------------------------
+NEKOBT_LATINO_CF_NAME   = "NekoBT - Audio: Spanish (Latino)"
+NEKOBT_ORIGINAL_CF_NAME = "NekoBT - Audio: Original (Japanese)"
+NEKOBT_LATINO_RE_NAME   = "NekoBT Tag - Audio Spanish (Latino)"
+NEKOBT_ORIGINAL_RE_NAME = "NekoBT Tag - Audio Japanese"
+NEKOBT_LATINO_PATTERN   = r"{Tags:.*A=[^;]*\b(es419)\b[^;]*\b.*}"
+NEKOBT_ORIGINAL_PATTERN = r"{Tags:.*A=[^;]*\b(ja)\b[^;]*\b.*}"
+NEKOBT_LATINO_SCORE     = 500
+NEKOBT_ORIGINAL_SCORE   = 25
+NEKOBT_TARGET_PROFILE   = "Anime 1080p"
+
 # Columns that reference an entity name and must be rewritten when its parent
 # entity is namespaced.
 NAME_REF_COLUMNS = {
@@ -292,6 +310,57 @@ def build_language_priority_sql(profile_arr_types):
     return "\n".join(lines)
 
 
+def build_nekobt_test_sql(profile_arr_types):
+    """Layer 4: NekoBT-specific custom formats. Match the {Tags:...} block
+    NekoBT appends to release titles rather than Mediainfo audio tracks
+    (Profilarr's usual 'language' condition type can't see these tags --
+    they only exist in the title). Scored on 'Anime 1080p' only, mirroring
+    whatever arr_type(s) that profile is already scored under."""
+    lines = [
+        "-- ===== Layer 4: NekoBT test formats (Audio tag matching) =====",
+        "",
+        f'INSERT OR IGNORE INTO "regular_expressions" ("name", "pattern", "regex101_id", "description") '
+        f"VALUES ('{NEKOBT_LATINO_RE_NAME}', '{NEKOBT_LATINO_PATTERN}', NULL, "
+        f"'Matches NekoBT auto-title tag for Spanish (Latin America) audio (A=es419).');",
+        f'INSERT OR IGNORE INTO "regular_expressions" ("name", "pattern", "regex101_id", "description") '
+        f"VALUES ('{NEKOBT_ORIGINAL_RE_NAME}', '{NEKOBT_ORIGINAL_PATTERN}', NULL, "
+        f"'Matches NekoBT auto-title tag for Japanese audio (A=ja).');",
+        "",
+        f'INSERT OR IGNORE INTO "custom_formats" ("name", "description", "include_in_rename") '
+        f"VALUES ('{NEKOBT_LATINO_CF_NAME}', 'Test format: matches NekoBT releases with a Spanish (Latino) audio track per their auto-title tags.', 0);",
+        f'INSERT OR IGNORE INTO "custom_formats" ("name", "description", "include_in_rename") '
+        f"VALUES ('{NEKOBT_ORIGINAL_CF_NAME}', 'Test format: matches NekoBT releases with a Japanese (original) audio track per their auto-title tags.', 0);",
+        "",
+        f'INSERT OR IGNORE INTO "custom_format_conditions" '
+        f'("custom_format_name", "name", "type", "arr_type", "negate", "required") '
+        f"VALUES ('{NEKOBT_LATINO_CF_NAME}', '{NEKOBT_LATINO_RE_NAME}', 'release_title', 'all', 0, 1);",
+        f'INSERT OR IGNORE INTO "custom_format_conditions" '
+        f'("custom_format_name", "name", "type", "arr_type", "negate", "required") '
+        f"VALUES ('{NEKOBT_ORIGINAL_CF_NAME}', '{NEKOBT_ORIGINAL_RE_NAME}', 'release_title', 'all', 0, 1);",
+        "",
+        f'INSERT OR IGNORE INTO "condition_patterns" '
+        f'("custom_format_name", "condition_name", "regular_expression_name") '
+        f"VALUES ('{NEKOBT_LATINO_CF_NAME}', '{NEKOBT_LATINO_RE_NAME}', '{NEKOBT_LATINO_RE_NAME}');",
+        f'INSERT OR IGNORE INTO "condition_patterns" '
+        f'("custom_format_name", "condition_name", "regular_expression_name") '
+        f"VALUES ('{NEKOBT_ORIGINAL_CF_NAME}', '{NEKOBT_ORIGINAL_RE_NAME}', '{NEKOBT_ORIGINAL_RE_NAME}');",
+        "",
+    ]
+
+    arr_types = profile_arr_types.get(NEKOBT_TARGET_PROFILE, {'radarr', 'sonarr'})
+    targets = {'all'} if 'all' in arr_types else arr_types
+    for arr_type in sorted(targets):
+        for cf_name, score in ((NEKOBT_LATINO_CF_NAME, NEKOBT_LATINO_SCORE),
+                                (NEKOBT_ORIGINAL_CF_NAME, NEKOBT_ORIGINAL_SCORE)):
+            lines.append(
+                'INSERT OR IGNORE INTO "quality_profile_custom_formats" '
+                '("quality_profile_name", "custom_format_name", "arr_type", "score") '
+                f"VALUES ('{NEKOBT_TARGET_PROFILE}', '{cf_name}', '{arr_type}', {score});"
+            )
+    lines.append("")
+    return "\n".join(lines)
+
+
 def main():
     print("[1/6] Loading Dictionarry chain...")
     dict_con, dict_fails = build_state([SCHEMA_DIR, DICT_DIR])
@@ -360,6 +429,9 @@ PRAGMA foreign_keys = OFF;
                 profile_arr_types.setdefault(name, set()).add(arr_type)
         f.write("\n")
         f.write(build_language_priority_sql(profile_arr_types))
+
+        f.write("\n")
+        f.write(build_nekobt_test_sql(profile_arr_types))
 
         f.write("\nPRAGMA foreign_keys = ON;\n")
 
