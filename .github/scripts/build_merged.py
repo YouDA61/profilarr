@@ -75,7 +75,7 @@ NEKOBT_ORIGINAL_RE_NAME = "NekoBT Tag - Audio Japanese"
 NEKOBT_LATINO_PATTERN   = r"{Tags:.*A=[^;]*\b(es419)\b[^;]*\b.*}"
 NEKOBT_ORIGINAL_PATTERN = r"{Tags:.*A=[^;]*\b(ja)\b[^;]*\b.*}"
 NEKOBT_LATINO_SCORE     = 500
-NEKOBT_ORIGINAL_SCORE   = 200
+NEKOBT_ORIGINAL_SCORE   = 25
 NEKOBT_TARGET_PROFILE   = "Anime 1080p"
 
 # Columns that reference an entity name and must be rewritten when its parent

@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Merged Profilarr v2 snapshot
--- Generated: 2026-07-14 18:55 UTC
+-- Generated: 2026-07-14 19:10 UTC
 -- Sources:
 --   Dictionarry-Hub/schema    (e1c2bd73)
 --   Dictionarry-Hub/database  @ v2     (fdd2c990)
@@ -16212,6 +16212,6 @@ INSERT OR IGNORE INTO "condition_patterns" ("custom_format_name", "condition_nam
 INSERT OR IGNORE INTO "condition_patterns" ("custom_format_name", "condition_name", "regular_expression_name") VALUES ('NekoBT - Audio: Original (Japanese)', 'NekoBT Tag - Audio Japanese', 'NekoBT Tag - Audio Japanese');
 
 INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('Anime 1080p', 'NekoBT - Audio: Spanish (Latino)', 'all', 500);
-INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('Anime 1080p', 'NekoBT - Audio: Original (Japanese)', 'all', 200);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('Anime 1080p', 'NekoBT - Audio: Original (Japanese)', 'all', 25);
 
 PRAGMA foreign_keys = ON;
