@@ -48,6 +48,37 @@ OUT_MANIFEST = "pcd.json"
 
 NAMESPACE_SUFFIX = " [Dumpstarr]"
 
+# ----------------------------------------------------------------------------
+# Anime 1080p rework: retire the English-centric "Anime Dual Audio" detection
+# (title regex hardcoding EN/English paired with JA/ZH/KO) in favor of two
+# independent, NekoBT-tag-based formats. NekoBT exposes audio language
+# unambiguously via a {Tags:...A=<code>...} block on the release title (see
+# wiki.nekobt.to/info/metadata#auto-titles), so there's no need to infer
+# language from loose title text anymore -- Latino no longer needs to be
+# paired with the original language to score well, it just needs to be
+# present. "Dubs Only" (English-dub-only releases) goes from a hard ban to
+# a soft last-resort penalty, consistent with "Latino > Original > anything".
+# Every entity touched here (CF, its conditions/patterns, and the two
+# regexes 'Dual Audio [Dumpstarr]' / 'Anime Single Language') is exclusive
+# to Anime 1080p -- nothing shared with other profiles is modified.
+# ----------------------------------------------------------------------------
+ANIME_PROFILE = "Anime 1080p"
+
+ANIME_RETIRED_CF = "Anime Dual Audio"
+ANIME_RETIRED_REGEXES = ("Dual Audio [Dumpstarr]", "Anime Single Language")
+
+ANIME_LATINO_CF_NAME   = "Anime Latino Audio"
+ANIME_ORIGINAL_CF_NAME = "Anime Original Audio"
+ANIME_LATINO_RE_NAME   = "Anime Latino Audio Tag"
+ANIME_ORIGINAL_RE_NAME = "Anime Original Audio Tag"
+ANIME_LATINO_PATTERN   = r"{Tags:.*A=[^;]*\b(es419)\b[^;]*\b.*}"
+ANIME_ORIGINAL_PATTERN = r"{Tags:.*A=[^;]*\b(ja)\b[^;]*\b.*}"
+ANIME_LATINO_SCORE      = 1000
+ANIME_ORIGINAL_SCORE    = 25
+
+ANIME_DUBS_ONLY_CF    = "Dubs Only"
+ANIME_DUBS_ONLY_SCORE = -50
+
 # Columns that reference an entity name and must be rewritten when its parent
 # entity is namespaced.
 NAME_REF_COLUMNS = {
@@ -237,6 +268,84 @@ def build_rename_maps(dict_con, dump_con):
     return cf_renames, re_renames
 
 
+def build_anime_latino_rework_sql():
+    """Layer 3: rework Anime 1080p's language logic around NekoBT's
+    {Tags:...A=<code>...} title tag instead of guessing from loose title
+    text. Deletes the retired CF/regex entities in FK-safe dependency order
+    (children before parents) before inserting their replacements, so the
+    final foreign_key_check in main()'s verify step stays clean."""
+    lines = [
+        "-- ===== Layer 3: Anime 1080p reworked for Latino/Original (NekoBT tags) =====",
+        "",
+        f'-- Retire "{ANIME_RETIRED_CF}" (English-centric title inference) and its',
+        "-- exclusive regexes -- nothing else in the database references them.",
+        f'DELETE FROM "quality_profile_custom_formats" WHERE "custom_format_name" = \'{ANIME_RETIRED_CF}\';',
+        f'DELETE FROM "custom_format_tags" WHERE "custom_format_name" = \'{ANIME_RETIRED_CF}\';',
+        f'DELETE FROM "condition_languages" WHERE "custom_format_name" = \'{ANIME_RETIRED_CF}\';',
+        f'DELETE FROM "condition_patterns" WHERE "custom_format_name" = \'{ANIME_RETIRED_CF}\';',
+        f'DELETE FROM "custom_format_conditions" WHERE "custom_format_name" = \'{ANIME_RETIRED_CF}\';',
+        f'DELETE FROM "custom_formats" WHERE "name" = \'{ANIME_RETIRED_CF}\';',
+    ]
+    for re_name in ANIME_RETIRED_REGEXES:
+        lines.append(f'DELETE FROM "regular_expression_tags" WHERE "regular_expression_name" = \'{re_name}\';')
+    for re_name in ANIME_RETIRED_REGEXES:
+        lines.append(f'DELETE FROM "regular_expressions" WHERE "name" = \'{re_name}\';')
+
+    lines += [
+        "",
+        "-- New NekoBT-tag-based replacements.",
+        f'INSERT OR IGNORE INTO "regular_expressions" ("name", "pattern", "regex101_id", "description") '
+        f"VALUES ('{ANIME_LATINO_RE_NAME}', '{ANIME_LATINO_PATTERN}', NULL, "
+        f"'Matches NekoBT auto-title tag for Spanish (Latin America) audio (A=es419).');",
+        f'INSERT OR IGNORE INTO "regular_expressions" ("name", "pattern", "regex101_id", "description") '
+        f"VALUES ('{ANIME_ORIGINAL_RE_NAME}', '{ANIME_ORIGINAL_PATTERN}', NULL, "
+        f"'Matches NekoBT auto-title tag for Japanese (original) audio (A=ja).');",
+        "",
+        f'INSERT OR IGNORE INTO "custom_formats" ("name", "description", "include_in_rename") '
+        f"VALUES ('{ANIME_LATINO_CF_NAME}', 'Matches releases with a Spanish (Latino) audio track per NekoBT auto-title tags.', 0);",
+        f'INSERT OR IGNORE INTO "custom_formats" ("name", "description", "include_in_rename") '
+        f"VALUES ('{ANIME_ORIGINAL_CF_NAME}', 'Matches releases with the Japanese (original) audio track per NekoBT auto-title tags.', 0);",
+        "",
+        f'INSERT OR IGNORE INTO "custom_format_conditions" '
+        f'("custom_format_name", "name", "type", "arr_type", "negate", "required") '
+        f"VALUES ('{ANIME_LATINO_CF_NAME}', '{ANIME_LATINO_RE_NAME}', 'release_title', 'all', 0, 1);",
+        f'INSERT OR IGNORE INTO "custom_format_conditions" '
+        f'("custom_format_name", "name", "type", "arr_type", "negate", "required") '
+        f"VALUES ('{ANIME_ORIGINAL_CF_NAME}', '{ANIME_ORIGINAL_RE_NAME}', 'release_title', 'all', 0, 1);",
+        "",
+        f'INSERT OR IGNORE INTO "condition_patterns" '
+        f'("custom_format_name", "condition_name", "regular_expression_name") '
+        f"VALUES ('{ANIME_LATINO_CF_NAME}', '{ANIME_LATINO_RE_NAME}', '{ANIME_LATINO_RE_NAME}');",
+        f'INSERT OR IGNORE INTO "condition_patterns" '
+        f'("custom_format_name", "condition_name", "regular_expression_name") '
+        f"VALUES ('{ANIME_ORIGINAL_CF_NAME}', '{ANIME_ORIGINAL_RE_NAME}', '{ANIME_ORIGINAL_RE_NAME}');",
+        "",
+        f'INSERT OR IGNORE INTO "custom_format_tags" ("custom_format_name", "tag_name") '
+        f"VALUES ('{ANIME_LATINO_CF_NAME}', 'Anime');",
+        f'INSERT OR IGNORE INTO "custom_format_tags" ("custom_format_name", "tag_name") '
+        f"VALUES ('{ANIME_ORIGINAL_CF_NAME}', 'Anime');",
+        "",
+        f'INSERT OR IGNORE INTO "quality_profile_custom_formats" '
+        f'("quality_profile_name", "custom_format_name", "arr_type", "score") '
+        f"VALUES ('{ANIME_PROFILE}', '{ANIME_LATINO_CF_NAME}', 'radarr', {ANIME_LATINO_SCORE});",
+        f'INSERT OR IGNORE INTO "quality_profile_custom_formats" '
+        f'("quality_profile_name", "custom_format_name", "arr_type", "score") '
+        f"VALUES ('{ANIME_PROFILE}', '{ANIME_LATINO_CF_NAME}', 'sonarr', {ANIME_LATINO_SCORE});",
+        f'INSERT OR IGNORE INTO "quality_profile_custom_formats" '
+        f'("quality_profile_name", "custom_format_name", "arr_type", "score") '
+        f"VALUES ('{ANIME_PROFILE}', '{ANIME_ORIGINAL_CF_NAME}', 'radarr', {ANIME_ORIGINAL_SCORE});",
+        f'INSERT OR IGNORE INTO "quality_profile_custom_formats" '
+        f'("quality_profile_name", "custom_format_name", "arr_type", "score") '
+        f"VALUES ('{ANIME_PROFILE}', '{ANIME_ORIGINAL_CF_NAME}', 'sonarr', {ANIME_ORIGINAL_SCORE});",
+        "",
+        f'-- Soften "{ANIME_DUBS_ONLY_CF}" from a hard ban to a last-resort penalty.',
+        f'UPDATE "quality_profile_custom_formats" SET "score" = {ANIME_DUBS_ONLY_SCORE} '
+        f"WHERE \"quality_profile_name\" = '{ANIME_PROFILE}' AND \"custom_format_name\" = '{ANIME_DUBS_ONLY_CF}';",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def main():
     print("[1/6] Loading Dictionarry chain...")
     dict_con, dict_fails = build_state([SCHEMA_DIR, DICT_DIR])
@@ -296,6 +405,10 @@ PRAGMA foreign_keys = OFF;
         for t in TABLES:
             f.write(dump_table(dump_con, t, cf_rename=cf_renames, re_rename=re_renames))
             f.write("\n")
+
+        f.write("\n")
+        f.write(build_anime_latino_rework_sql())
+
         f.write("\nPRAGMA foreign_keys = ON;\n")
 
     size = os.path.getsize(OUT_SQL)
