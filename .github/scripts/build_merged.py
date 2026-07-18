@@ -346,6 +346,38 @@ def build_anime_latino_rework_sql():
     return "\n".join(lines)
 
 
+# Every table keyed by quality_profile_name that needs pruning when a profile
+# is removed. Does NOT include custom_formats/regular_expressions/languages/
+# qualities -- those are a shared library and stay intact even if unused by
+# the remaining profile, so nothing here touches them.
+PROFILE_SCOPED_TABLES = (
+    'quality_group_members',
+    'quality_groups',
+    'quality_profile_custom_formats',
+    'quality_profile_languages',
+    'quality_profile_qualities',
+    'quality_profile_tags',
+)
+
+
+def build_anime_only_pruning_sql():
+    """Layer 4: this database is anime-only now -- drop every quality
+    profile except Anime 1080p, along with their profile-scoped join-table
+    rows. The custom_formats/regular_expressions library itself is left
+    completely untouched (still a shared pool, just unused by other
+    profiles), matching how Layer 3 retired entities without deleting
+    anything shared."""
+    lines = [
+        "-- ===== Layer 4: anime-only -- drop every profile except Anime 1080p =====",
+        "",
+    ]
+    for t in PROFILE_SCOPED_TABLES:
+        lines.append(f'DELETE FROM "{t}" WHERE "quality_profile_name" != \'{ANIME_PROFILE}\';')
+    lines.append(f'DELETE FROM "quality_profiles" WHERE "name" != \'{ANIME_PROFILE}\';')
+    lines.append("")
+    return "\n".join(lines)
+
+
 def main():
     print("[1/6] Loading Dictionarry chain...")
     dict_con, dict_fails = build_state([SCHEMA_DIR, DICT_DIR])
@@ -408,6 +440,9 @@ PRAGMA foreign_keys = OFF;
 
         f.write("\n")
         f.write(build_anime_latino_rework_sql())
+
+        f.write("\n")
+        f.write(build_anime_only_pruning_sql())
 
         f.write("\nPRAGMA foreign_keys = ON;\n")
 

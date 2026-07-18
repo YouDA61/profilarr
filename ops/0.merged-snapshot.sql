@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Merged Profilarr v2 snapshot
--- Generated: 2026-07-18 02:26 UTC
+-- Generated: 2026-07-18 02:33 UTC
 -- Sources:
 --   Dictionarry-Hub/schema    (e1c2bd73)
 --   Dictionarry-Hub/database  @ v2     (fdd2c990)
@@ -16216,5 +16216,15 @@ INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", 
 
 -- Soften "Dubs Only" from a hard ban to a last-resort penalty.
 UPDATE "quality_profile_custom_formats" SET "score" = -50 WHERE "quality_profile_name" = 'Anime 1080p' AND "custom_format_name" = 'Dubs Only';
+
+-- ===== Layer 4: anime-only -- drop every profile except Anime 1080p =====
+
+DELETE FROM "quality_group_members" WHERE "quality_profile_name" != 'Anime 1080p';
+DELETE FROM "quality_groups" WHERE "quality_profile_name" != 'Anime 1080p';
+DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" != 'Anime 1080p';
+DELETE FROM "quality_profile_languages" WHERE "quality_profile_name" != 'Anime 1080p';
+DELETE FROM "quality_profile_qualities" WHERE "quality_profile_name" != 'Anime 1080p';
+DELETE FROM "quality_profile_tags" WHERE "quality_profile_name" != 'Anime 1080p';
+DELETE FROM "quality_profiles" WHERE "name" != 'Anime 1080p';
 
 PRAGMA foreign_keys = ON;
