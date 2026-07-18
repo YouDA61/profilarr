@@ -94,6 +94,7 @@ GENERAL_PROFILES = (
     "1080p Balanced", "1080p Compact", "1080p Efficient",
     "1080p Quality", "1080p Quality HDR", "1080p Remux",
     "2160p Balanced", "2160p Efficient", "2160p Quality", "2160p Remux",
+    "720p Quality",
 )
 
 GENERAL_BLOCKED_CF = "Not Original or English"
@@ -107,6 +108,26 @@ GENERAL_ENGLISH_LANG  = "English"
 GENERAL_LATINO_SCORE   = 150000
 GENERAL_ORIGINAL_SCORE = 30000
 GENERAL_ENGLISH_SCORE  = 15000
+
+# ----------------------------------------------------------------------------
+# Dumpstarr's general-purpose profiles (LQ 1080p, Movies x4, TV x2): same
+# three CFs as GENERAL_PROFILES (reused, not redefined) but scored on a much
+# smaller scale (their own top CFs run ~1,700-1,900) and gated differently --
+# these have no "Not Original or English" CF. Instead their native
+# quality_profile_languages field sets language_name='Original' with
+# type='must', a REQUIRED filter that runs before any CF score is even
+# considered. A Latino-only release would never reach scoring at all, so
+# this has to flip to 'simple' (matching Anime 1080p's own setting) rather
+# than just being neutralized via a score change.
+# ----------------------------------------------------------------------------
+DUMPSTARR_GENERAL_PROFILES = (
+    "LQ 1080p", "Movies 1080p", "Movies 1080p HQ",
+    "Movies 2160p", "Movies 2160p HQ", "TV 1080p", "TV 2160p",
+)
+
+DUMPSTARR_GENERAL_LATINO_SCORE   = 1000
+DUMPSTARR_GENERAL_ORIGINAL_SCORE = 200
+DUMPSTARR_GENERAL_ENGLISH_SCORE  = 100
 
 # Columns that reference an entity name and must be rewritten when its parent
 # entity is namespaced.
@@ -389,7 +410,7 @@ PROFILE_SCOPED_TABLES = (
 )
 
 
-KEPT_PROFILES = (ANIME_PROFILE,) + GENERAL_PROFILES
+KEPT_PROFILES = (ANIME_PROFILE,) + GENERAL_PROFILES + DUMPSTARR_GENERAL_PROFILES
 
 
 def build_profile_pruning_sql():
@@ -483,6 +504,44 @@ def build_general_language_priority_sql(profile_arr_types):
     return "\n".join(lines)
 
 
+def build_dumpstarr_general_language_priority_sql(profile_arr_types):
+    """Layer 6: Latino > Original > English > anything for Dumpstarr's
+    LQ/Movies/TV profiles. Reuses the same 3 CFs Layer 5 already created
+    (just new quality_profile_custom_formats rows at this family's own
+    scale) -- no new custom_formats/conditions needed. Flips the native
+    quality_profile_languages requirement from 'must' to 'simple' so a
+    Latino-only release isn't excluded before scoring ever runs."""
+    lines = [
+        "-- ===== Layer 6: Dumpstarr LQ/Movies/TV -- Latino/Original/English priority =====",
+        "",
+        "-- 'Original' was a REQUIRED native language filter; loosen it so Latino-only",
+        "-- releases aren't excluded before Custom Format scoring even runs.",
+    ]
+    for profile in DUMPSTARR_GENERAL_PROFILES:
+        lines.append(
+            "UPDATE \"quality_profile_languages\" SET \"type\" = 'simple' "
+            f"WHERE \"quality_profile_name\" = '{profile}' AND \"language_name\" = '{GENERAL_ORIGINAL_LANG}';"
+        )
+    lines.append("")
+
+    for profile in DUMPSTARR_GENERAL_PROFILES:
+        arr_types = profile_arr_types.get(profile, {'radarr', 'sonarr'})
+        targets = {'all'} if 'all' in arr_types else arr_types
+        for arr_type in sorted(targets):
+            for cf_name, score in (
+                (GENERAL_LATINO_CF, DUMPSTARR_GENERAL_LATINO_SCORE),
+                (GENERAL_ORIGINAL_CF, DUMPSTARR_GENERAL_ORIGINAL_SCORE),
+                (GENERAL_ENGLISH_CF, DUMPSTARR_GENERAL_ENGLISH_SCORE),
+            ):
+                lines.append(
+                    'INSERT OR IGNORE INTO "quality_profile_custom_formats" '
+                    '("quality_profile_name", "custom_format_name", "arr_type", "score") '
+                    f"VALUES ('{profile}', '{cf_name}', '{arr_type}', {score});"
+                )
+    lines.append("")
+    return "\n".join(lines)
+
+
 def main():
     print("[1/6] Loading Dictionarry chain...")
     dict_con, dict_fails = build_state([SCHEMA_DIR, DICT_DIR])
@@ -557,6 +616,9 @@ PRAGMA foreign_keys = OFF;
                 profile_arr_types.setdefault(name, set()).add(arr_type)
         f.write("\n")
         f.write(build_general_language_priority_sql(profile_arr_types))
+
+        f.write("\n")
+        f.write(build_dumpstarr_general_language_priority_sql(profile_arr_types))
 
         f.write("\nPRAGMA foreign_keys = ON;\n")
 
