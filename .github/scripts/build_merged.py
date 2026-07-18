@@ -93,6 +93,7 @@ ANIME_DUBS_ONLY_SCORE = -50
 GENERAL_PROFILES = (
     "1080p Balanced", "1080p Compact", "1080p Efficient",
     "1080p Quality", "1080p Quality HDR", "1080p Remux",
+    "2160p Balanced", "2160p Efficient", "2160p Quality", "2160p Remux",
 )
 
 GENERAL_BLOCKED_CF = "Not Original or English"

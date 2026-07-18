@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Merged Profilarr v2 snapshot
--- Generated: 2026-07-18 05:51 UTC
+-- Generated: 2026-07-18 05:55 UTC
 -- Sources:
 --   Dictionarry-Hub/schema    (e1c2bd73)
 --   Dictionarry-Hub/database  @ v2     (fdd2c990)
@@ -16217,15 +16217,15 @@ INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", 
 -- Soften "Dubs Only" from a hard ban to a last-resort penalty.
 UPDATE "quality_profile_custom_formats" SET "score" = -50 WHERE "quality_profile_name" = 'Anime 1080p' AND "custom_format_name" = 'Dubs Only';
 
--- ===== Layer 4: drop every profile except Anime 1080p, 1080p Balanced, 1080p Compact, 1080p Efficient, 1080p Quality, 1080p Quality HDR, 1080p Remux =====
+-- ===== Layer 4: drop every profile except Anime 1080p, 1080p Balanced, 1080p Compact, 1080p Efficient, 1080p Quality, 1080p Quality HDR, 1080p Remux, 2160p Balanced, 2160p Efficient, 2160p Quality, 2160p Remux =====
 
-DELETE FROM "quality_group_members" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux');
-DELETE FROM "quality_groups" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux');
-DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux');
-DELETE FROM "quality_profile_languages" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux');
-DELETE FROM "quality_profile_qualities" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux');
-DELETE FROM "quality_profile_tags" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux');
-DELETE FROM "quality_profiles" WHERE "name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux');
+DELETE FROM "quality_group_members" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux', '2160p Balanced', '2160p Efficient', '2160p Quality', '2160p Remux');
+DELETE FROM "quality_groups" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux', '2160p Balanced', '2160p Efficient', '2160p Quality', '2160p Remux');
+DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux', '2160p Balanced', '2160p Efficient', '2160p Quality', '2160p Remux');
+DELETE FROM "quality_profile_languages" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux', '2160p Balanced', '2160p Efficient', '2160p Quality', '2160p Remux');
+DELETE FROM "quality_profile_qualities" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux', '2160p Balanced', '2160p Efficient', '2160p Quality', '2160p Remux');
+DELETE FROM "quality_profile_tags" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux', '2160p Balanced', '2160p Efficient', '2160p Quality', '2160p Remux');
+DELETE FROM "quality_profiles" WHERE "name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux', '2160p Balanced', '2160p Efficient', '2160p Quality', '2160p Remux');
 
 -- ===== Layer 5: General 1080p profiles -- Latino/Original/English priority =====
 
@@ -16236,6 +16236,10 @@ DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" = '108
 DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" = '1080p Quality' AND "custom_format_name" = 'Not Original or English';
 DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" = '1080p Quality HDR' AND "custom_format_name" = 'Not Original or English';
 DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" = '1080p Remux' AND "custom_format_name" = 'Not Original or English';
+DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" = '2160p Balanced' AND "custom_format_name" = 'Not Original or English';
+DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" = '2160p Efficient' AND "custom_format_name" = 'Not Original or English';
+DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" = '2160p Quality' AND "custom_format_name" = 'Not Original or English';
+DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" = '2160p Remux' AND "custom_format_name" = 'Not Original or English';
 
 -- New language-priority custom formats (native language condition, any indexer).
 INSERT OR IGNORE INTO "custom_formats" ("name", "description", "include_in_rename") VALUES ('Spanish (Latino) Audio', 'Matches releases with a Spanish (Latino) audio track.', 0);
@@ -16268,5 +16272,17 @@ INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", 
 INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Remux', 'Spanish (Latino) Audio', 'all', 150000);
 INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Remux', 'Original Language Audio', 'all', 30000);
 INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Remux', 'English Audio', 'all', 15000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('2160p Balanced', 'Spanish (Latino) Audio', 'all', 150000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('2160p Balanced', 'Original Language Audio', 'all', 30000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('2160p Balanced', 'English Audio', 'all', 15000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('2160p Efficient', 'Spanish (Latino) Audio', 'all', 150000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('2160p Efficient', 'Original Language Audio', 'all', 30000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('2160p Efficient', 'English Audio', 'all', 15000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('2160p Quality', 'Spanish (Latino) Audio', 'all', 150000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('2160p Quality', 'Original Language Audio', 'all', 30000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('2160p Quality', 'English Audio', 'all', 15000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('2160p Remux', 'Spanish (Latino) Audio', 'all', 150000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('2160p Remux', 'Original Language Audio', 'all', 30000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('2160p Remux', 'English Audio', 'all', 15000);
 
 PRAGMA foreign_keys = ON;
