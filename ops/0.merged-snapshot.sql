@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Merged Profilarr v2 snapshot
--- Generated: 2026-07-18 04:40 UTC
+-- Generated: 2026-07-18 05:51 UTC
 -- Sources:
 --   Dictionarry-Hub/schema    (e1c2bd73)
 --   Dictionarry-Hub/database  @ v2     (fdd2c990)
@@ -16217,14 +16217,56 @@ INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", 
 -- Soften "Dubs Only" from a hard ban to a last-resort penalty.
 UPDATE "quality_profile_custom_formats" SET "score" = -50 WHERE "quality_profile_name" = 'Anime 1080p' AND "custom_format_name" = 'Dubs Only';
 
--- ===== Layer 4: anime-only -- drop every profile except Anime 1080p =====
+-- ===== Layer 4: drop every profile except Anime 1080p, 1080p Balanced, 1080p Compact, 1080p Efficient, 1080p Quality, 1080p Quality HDR, 1080p Remux =====
 
-DELETE FROM "quality_group_members" WHERE "quality_profile_name" != 'Anime 1080p';
-DELETE FROM "quality_groups" WHERE "quality_profile_name" != 'Anime 1080p';
-DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" != 'Anime 1080p';
-DELETE FROM "quality_profile_languages" WHERE "quality_profile_name" != 'Anime 1080p';
-DELETE FROM "quality_profile_qualities" WHERE "quality_profile_name" != 'Anime 1080p';
-DELETE FROM "quality_profile_tags" WHERE "quality_profile_name" != 'Anime 1080p';
-DELETE FROM "quality_profiles" WHERE "name" != 'Anime 1080p';
+DELETE FROM "quality_group_members" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux');
+DELETE FROM "quality_groups" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux');
+DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux');
+DELETE FROM "quality_profile_languages" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux');
+DELETE FROM "quality_profile_qualities" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux');
+DELETE FROM "quality_profile_tags" WHERE "quality_profile_name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux');
+DELETE FROM "quality_profiles" WHERE "name" NOT IN ('Anime 1080p', '1080p Balanced', '1080p Compact', '1080p Efficient', '1080p Quality', '1080p Quality HDR', '1080p Remux');
+
+-- ===== Layer 5: General 1080p profiles -- Latino/Original/English priority =====
+
+-- Neutralize "Not Original or English" so Latino-only releases stop getting hard-banned.
+DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" = '1080p Balanced' AND "custom_format_name" = 'Not Original or English';
+DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" = '1080p Compact' AND "custom_format_name" = 'Not Original or English';
+DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" = '1080p Efficient' AND "custom_format_name" = 'Not Original or English';
+DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" = '1080p Quality' AND "custom_format_name" = 'Not Original or English';
+DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" = '1080p Quality HDR' AND "custom_format_name" = 'Not Original or English';
+DELETE FROM "quality_profile_custom_formats" WHERE "quality_profile_name" = '1080p Remux' AND "custom_format_name" = 'Not Original or English';
+
+-- New language-priority custom formats (native language condition, any indexer).
+INSERT OR IGNORE INTO "custom_formats" ("name", "description", "include_in_rename") VALUES ('Spanish (Latino) Audio', 'Matches releases with a Spanish (Latino) audio track.', 0);
+INSERT OR IGNORE INTO "custom_formats" ("name", "description", "include_in_rename") VALUES ('Original Language Audio', 'Matches releases with the Original language audio track.', 0);
+INSERT OR IGNORE INTO "custom_formats" ("name", "description", "include_in_rename") VALUES ('English Audio', 'Matches releases with an English audio track.', 0);
+
+INSERT OR IGNORE INTO "custom_format_conditions" ("custom_format_name", "name", "type", "arr_type", "negate", "required") VALUES ('Spanish (Latino) Audio', 'Spanish (Latino)', 'language', 'all', 0, 1);
+INSERT OR IGNORE INTO "custom_format_conditions" ("custom_format_name", "name", "type", "arr_type", "negate", "required") VALUES ('Original Language Audio', 'Original', 'language', 'all', 0, 1);
+INSERT OR IGNORE INTO "custom_format_conditions" ("custom_format_name", "name", "type", "arr_type", "negate", "required") VALUES ('English Audio', 'English', 'language', 'all', 0, 1);
+
+INSERT OR IGNORE INTO "condition_languages" ("custom_format_name", "condition_name", "language_name", "except_language") VALUES ('Spanish (Latino) Audio', 'Spanish (Latino)', 'Spanish (Latino)', 0);
+INSERT OR IGNORE INTO "condition_languages" ("custom_format_name", "condition_name", "language_name", "except_language") VALUES ('Original Language Audio', 'Original', 'Original', 0);
+INSERT OR IGNORE INTO "condition_languages" ("custom_format_name", "condition_name", "language_name", "except_language") VALUES ('English Audio', 'English', 'English', 0);
+
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Balanced', 'Spanish (Latino) Audio', 'all', 150000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Balanced', 'Original Language Audio', 'all', 30000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Balanced', 'English Audio', 'all', 15000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Compact', 'Spanish (Latino) Audio', 'all', 150000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Compact', 'Original Language Audio', 'all', 30000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Compact', 'English Audio', 'all', 15000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Efficient', 'Spanish (Latino) Audio', 'all', 150000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Efficient', 'Original Language Audio', 'all', 30000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Efficient', 'English Audio', 'all', 15000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Quality', 'Spanish (Latino) Audio', 'all', 150000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Quality', 'Original Language Audio', 'all', 30000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Quality', 'English Audio', 'all', 15000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Quality HDR', 'Spanish (Latino) Audio', 'all', 150000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Quality HDR', 'Original Language Audio', 'all', 30000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Quality HDR', 'English Audio', 'all', 15000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Remux', 'Spanish (Latino) Audio', 'all', 150000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Remux', 'Original Language Audio', 'all', 30000);
+INSERT OR IGNORE INTO "quality_profile_custom_formats" ("quality_profile_name", "custom_format_name", "arr_type", "score") VALUES ('1080p Remux', 'English Audio', 'all', 15000);
 
 PRAGMA foreign_keys = ON;

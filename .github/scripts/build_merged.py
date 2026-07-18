@@ -79,6 +79,34 @@ ANIME_ORIGINAL_SCORE    = 25
 ANIME_DUBS_ONLY_CF    = "Dubs Only"
 ANIME_DUBS_ONLY_SCORE = -50
 
+# ----------------------------------------------------------------------------
+# General (non-anime) 1080p profiles: same "Latino > Original > anything"
+# philosophy, but these are indexer-agnostic (no NekoBT tags), so language
+# detection uses Radarr/Sonarr's native `language` condition type instead of
+# release-title regex. Four-tier priority via independently-scored CFs:
+# Latino > Original > English > (nothing, no longer banned). Scores are
+# calibrated to each profile's real scale (top source/tier CFs run
+# 100,000-960,000+) rather than reusing Anime's 0-1000 scale, and English is
+# kept low enough that Original+English stacking (the common case for
+# English-original Hollywood content) still can't outscore Latino alone.
+# ----------------------------------------------------------------------------
+GENERAL_PROFILES = (
+    "1080p Balanced", "1080p Compact", "1080p Efficient",
+    "1080p Quality", "1080p Quality HDR", "1080p Remux",
+)
+
+GENERAL_BLOCKED_CF = "Not Original or English"
+
+GENERAL_LATINO_CF     = "Spanish (Latino) Audio"
+GENERAL_ORIGINAL_CF   = "Original Language Audio"
+GENERAL_ENGLISH_CF    = "English Audio"
+GENERAL_LATINO_LANG   = "Spanish (Latino)"
+GENERAL_ORIGINAL_LANG = "Original"
+GENERAL_ENGLISH_LANG  = "English"
+GENERAL_LATINO_SCORE   = 150000
+GENERAL_ORIGINAL_SCORE = 30000
+GENERAL_ENGLISH_SCORE  = 15000
+
 # Columns that reference an entity name and must be rewritten when its parent
 # entity is namespaced.
 NAME_REF_COLUMNS = {
@@ -360,20 +388,96 @@ PROFILE_SCOPED_TABLES = (
 )
 
 
-def build_anime_only_pruning_sql():
-    """Layer 4: this database is anime-only now -- drop every quality
-    profile except Anime 1080p, along with their profile-scoped join-table
-    rows. The custom_formats/regular_expressions library itself is left
-    completely untouched (still a shared pool, just unused by other
-    profiles), matching how Layer 3 retired entities without deleting
-    anything shared."""
+KEPT_PROFILES = (ANIME_PROFILE,) + GENERAL_PROFILES
+
+
+def build_profile_pruning_sql():
+    """Layer 4: drop every quality profile except the ones we actively
+    maintain (Anime 1080p + the 6 general 1080p profiles), along with their
+    profile-scoped join-table rows. The custom_formats/regular_expressions
+    library itself is left completely untouched (still a shared pool, just
+    unused by other profiles), matching how Layer 3 retired entities
+    without deleting anything shared."""
+    keep_list = ", ".join(f"'{p}'" for p in KEPT_PROFILES)
     lines = [
-        "-- ===== Layer 4: anime-only -- drop every profile except Anime 1080p =====",
+        f"-- ===== Layer 4: drop every profile except {', '.join(KEPT_PROFILES)} =====",
         "",
     ]
     for t in PROFILE_SCOPED_TABLES:
-        lines.append(f'DELETE FROM "{t}" WHERE "quality_profile_name" != \'{ANIME_PROFILE}\';')
-    lines.append(f'DELETE FROM "quality_profiles" WHERE "name" != \'{ANIME_PROFILE}\';')
+        lines.append(f'DELETE FROM "{t}" WHERE "quality_profile_name" NOT IN ({keep_list});')
+    lines.append(f'DELETE FROM "quality_profiles" WHERE "name" NOT IN ({keep_list});')
+    lines.append("")
+    return "\n".join(lines)
+
+
+def build_general_language_priority_sql(profile_arr_types):
+    """Layer 5: Latino > Original > English > anything, for the 6 general
+    1080p profiles. Unlike Anime's NekoBT-tag approach, this uses Radarr/
+    Sonarr's native `language` condition type (condition_languages), which
+    works for any indexer since it doesn't depend on release-title text.
+    First neutralizes 'Not Original or English' (-999999) on these
+    profiles -- otherwise a Latino-only release would be hard-banned
+    before it ever gets a chance to score."""
+    lines = [
+        "-- ===== Layer 5: General 1080p profiles -- Latino/Original/English priority =====",
+        "",
+        f'-- Neutralize "{GENERAL_BLOCKED_CF}" so Latino-only releases stop getting hard-banned.',
+    ]
+    for profile in GENERAL_PROFILES:
+        lines.append(
+            'DELETE FROM "quality_profile_custom_formats" '
+            f"WHERE \"quality_profile_name\" = '{profile}' AND \"custom_format_name\" = '{GENERAL_BLOCKED_CF}';"
+        )
+    lines.append("")
+
+    lines.append("-- New language-priority custom formats (native language condition, any indexer).")
+    for cf_name, lang_name, desc in (
+        (GENERAL_LATINO_CF, GENERAL_LATINO_LANG, "Matches releases with a Spanish (Latino) audio track."),
+        (GENERAL_ORIGINAL_CF, GENERAL_ORIGINAL_LANG, "Matches releases with the Original language audio track."),
+        (GENERAL_ENGLISH_CF, GENERAL_ENGLISH_LANG, "Matches releases with an English audio track."),
+    ):
+        lines.append(
+            f'INSERT OR IGNORE INTO "custom_formats" ("name", "description", "include_in_rename") '
+            f"VALUES ('{cf_name}', '{desc}', 0);"
+        )
+    lines.append("")
+    for cf_name, lang_name in (
+        (GENERAL_LATINO_CF, GENERAL_LATINO_LANG),
+        (GENERAL_ORIGINAL_CF, GENERAL_ORIGINAL_LANG),
+        (GENERAL_ENGLISH_CF, GENERAL_ENGLISH_LANG),
+    ):
+        lines.append(
+            f'INSERT OR IGNORE INTO "custom_format_conditions" '
+            f'("custom_format_name", "name", "type", "arr_type", "negate", "required") '
+            f"VALUES ('{cf_name}', '{lang_name}', 'language', 'all', 0, 1);"
+        )
+    lines.append("")
+    for cf_name, lang_name in (
+        (GENERAL_LATINO_CF, GENERAL_LATINO_LANG),
+        (GENERAL_ORIGINAL_CF, GENERAL_ORIGINAL_LANG),
+        (GENERAL_ENGLISH_CF, GENERAL_ENGLISH_LANG),
+    ):
+        lines.append(
+            f'INSERT OR IGNORE INTO "condition_languages" '
+            f'("custom_format_name", "condition_name", "language_name", "except_language") '
+            f"VALUES ('{cf_name}', '{lang_name}', '{lang_name}', 0);"
+        )
+    lines.append("")
+
+    for profile in GENERAL_PROFILES:
+        arr_types = profile_arr_types.get(profile, {'radarr', 'sonarr'})
+        targets = {'all'} if 'all' in arr_types else arr_types
+        for arr_type in sorted(targets):
+            for cf_name, score in (
+                (GENERAL_LATINO_CF, GENERAL_LATINO_SCORE),
+                (GENERAL_ORIGINAL_CF, GENERAL_ORIGINAL_SCORE),
+                (GENERAL_ENGLISH_CF, GENERAL_ENGLISH_SCORE),
+            ):
+                lines.append(
+                    'INSERT OR IGNORE INTO "quality_profile_custom_formats" '
+                    '("quality_profile_name", "custom_format_name", "arr_type", "score") '
+                    f"VALUES ('{profile}', '{cf_name}', '{arr_type}', {score});"
+                )
     lines.append("")
     return "\n".join(lines)
 
@@ -442,7 +546,16 @@ PRAGMA foreign_keys = OFF;
         f.write(build_anime_latino_rework_sql())
 
         f.write("\n")
-        f.write(build_anime_only_pruning_sql())
+        f.write(build_profile_pruning_sql())
+
+        profile_arr_types = {}
+        for con in (dict_con, dump_con):
+            for name, arr_type in con.execute(
+                "SELECT DISTINCT quality_profile_name, arr_type FROM quality_profile_custom_formats"
+            ).fetchall():
+                profile_arr_types.setdefault(name, set()).add(arr_type)
+        f.write("\n")
+        f.write(build_general_language_priority_sql(profile_arr_types))
 
         f.write("\nPRAGMA foreign_keys = ON;\n")
 
